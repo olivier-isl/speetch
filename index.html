@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style type="text/css">
+        body {
+            background-color: #38c;
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1 {
+            text-align: center;
+            color: white;
+            text-shadow: 0 3px 3px #148;
+        }
+
+        #speech-synthesis-demo {
+            width: 650px;
+            margin: 50px auto 0;
+        }
+
+        #speech-synthesis-demo td:nth-child(1) {
+            color: white;
+            text-shadow: 0 1px 0 #888;
+        }
+
+        #voicelist,
+        #speech-input,
+        #speak-btn {
+            width: 100%;
+            display: block;
+            margin: 5px;
+            padding: 5px;
+            border: 0;
+            box-sizing: border-box;
+        }
+        
+        #speech-input {
+            width:600px;
+        }
+
+        #clover {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+    </style>
+</head>
+
+<body>
+    <textarea rows="10" id="speech-input">Je suis une fougère unijambiste</textarea>
+
+    <canvas id="clover"></canvas>
+    
+    <script>
+        window.requestAnimFrame =
+            window.requestAnimationFrame ||
+            window.webkitRequestAnimationFrame ||
+            window.mozRequestAnimationFrame ||
+            window.ORequestAnimationFrame ||
+            window.msRequestAnimationFrame ||
+            function (callback) {
+                setTimeout(callback, 1000 / 60);
+            };
+        var ctxA = new(window.AudioContext || window.webkitAudioContext)(),
+            fileReader,
+            spectrums,
+            gainNode,
+            source,
+            audio,
+            colour,
+            analyser,
+            cWidth = 300;
+
+        const $ = el => {
+            if (el.includes('<', 0) && el.includes('>', el.length - 1)) {
+                console.log(el)
+                return document.createElement(el.slice(1, -1))
+            } else {
+                if (document.querySelectorAll(el).length > 1) {
+                    return document.querySelectorAll(el)
+                } else {
+                    return document.querySelector(el)
+                }
+            }
+        }
+
+        function choiceSpeech(callback) {
+            if (speechSynthesis.onvoiceschanged !== null && speechSynthesis.getVoices().length) {
+                callback();
+            } else {
+                choiceSpeech(callback)
+            }
+        }
+
+        let speechValue = null;
+        if (speechSynthesis.onvoiceschanged === null) {
+            speechSynthesis.onvoiceschanged = function () {
+                return speechSynthesis.getVoices()
+            };
+        }
+        
+        document.querySelector('#speech-input').addEventListener('keypress', () => {
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+            var text = $('#speech-input').value
+            choiceSpeech(function () {
+                var msg = new SpeechSynthesisUtterance();
+                msg.voice = speechSynthesis.getVoices()[0]
+                console.log(speechSynthesis.getVoices())
+                msg.text = text
+                speechSynthesis.speak(msg);
+
+                // audio system
+                //music.init(speechSynthesis.speak(msg));
+
+            });
+        })
+
+        canvas = document.querySelector('#clover');
+        canvas.width = window.innerWidth
+        canvas.height = window.innerHeight
+        ctx = canvas.getContext('2d', {
+            'alpha': true
+        })
+
+        var shade = {
+
+            data: {
+                rayon: 30
+            },
+
+            init: function () {
+                this.color();
+                this.update();
+            },
+
+            draw: function (rayon) {
+
+                ctx.beginPath();
+                ctx.arc(canvas.width / 2, canvas.height / 2, rayon, 0, Math.PI * 2, 2);
+                ctx.fill();
+
+                ctx.closePath();
+            },
+
+            update: function (step) {
+                that = shade.data;
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                music.create();
+                requestAnimFrame(shade.update);
+            },
+
+            color: function () {
+                const color = 'rgba(' + 120 + ',' + 0 + ',' + 180 + ',0.8)';
+                ctx.fillStyle = color;
+            }
+        };
+
+
+
+        var music = {
+
+            init: function (data) {
+                shade.init();
+                analyser = ctxA.createAnalyser();
+                analyser.fftSize = 2048;
+                analyser.minDecibels = -256;
+                analyser.maxDecibels = 256;
+                analyser.smoothingTimeConstant = 0.75;
+                fileReader = new FileReader();
+                fileReader.readAsArrayBuffer(data)
+                ctxA.decodeAudioData(fileReader.result, function (buffer) {
+
+                    source = ctxA.createBufferSource();
+                    source.buffer = buffer;
+
+                    source.loop = true;
+                    source.connect(analyser);
+
+                    gainNode = ctxA.createGain();
+                    source.connect(gainNode);
+
+                    gainNode.connect(ctxA.destination);
+
+                    source.start(0);
+
+                    spectrums = new Uint8Array(analyser.frequencyBinCount);
+                    analyser.getByteTimeDomainData(spectrums);
+
+                });
+
+                this.update();
+
+            },
+
+            create: function () {
+                var rayon = spectrums / 1.5;
+                shade.draw(rayon);
+            },
+
+            update: function () {
+
+                spectrums = new Uint8Array(analyser.frequencyBinCount);
+                analyser.getByteTimeDomainData(spectrums);
+                requestAnimFrame(music.update);
+            }
+        };
+    </script>
+</body>
+
+</html>
